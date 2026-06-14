@@ -10,9 +10,12 @@
     "format": "biome format --write"
   },
   "dependencies": {
+    "heic-to": "^1.5.2",
     "next": "16.2.9",
+    "pako": "^2.1.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "utif": "^3.1.0"
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.0",
