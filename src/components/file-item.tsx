@@ -2,15 +2,22 @@
 
 import { type TargetFormat, targetInfo } from "@/lib/formats";
 import type { ConvertItem } from "@/lib/types";
-import { formatBytes } from "@/lib/utils";
+import { cn, formatBytes } from "@/lib/utils";
 import { IconCheck, IconClose, IconDownload, IconSpinner } from "./icons";
 import { Button, Tag } from "./ui";
 
-function savingsLabel(from: number, to: number): string | null {
+/**
+ * Size change as a signed percentage. `smaller` drives the color, so a file
+ * that grew never gets reported in the same green as a real saving.
+ */
+function sizeDelta(
+  from: number,
+  to: number,
+): { label: string; smaller: boolean } | null {
   if (!from || !to) return null;
   const pct = Math.round((1 - to / from) * 100);
-  if (pct >= 1) return `−${pct}%`;
-  if (pct <= -1) return `+${Math.abs(pct)}%`;
+  if (pct >= 1) return { label: `−${pct}%`, smaller: true };
+  if (pct <= -1) return { label: `+${Math.abs(pct)}%`, smaller: false };
   return null;
 }
 
@@ -25,18 +32,13 @@ function StatusTag({ item }: { item: ConvertItem }) {
           Converting
         </Tag>
       );
-    case "done": {
-      const saved = item.result
-        ? savingsLabel(item.size, item.result.size)
-        : null;
+    case "done":
       return (
         <Tag color="green">
           <IconCheck className="h-3 w-3" />
           Done
-          {saved && <span className="hidden sm:inline">{` · ${saved}`}</span>}
         </Tag>
       );
-    }
     case "error":
       return (
         <Tag color="red" title={item.error}>
@@ -59,6 +61,7 @@ export function FileItem({
 }) {
   const tgt = targetInfo(target);
   const result = item.status === "done" ? item.result : undefined;
+  const delta = result ? sizeDelta(item.size, result.size) : null;
 
   return (
     <li className="group flex items-center gap-3 px-3 py-2 transition-colors duration-100 hover:bg-wash">
@@ -84,9 +87,23 @@ export function FileItem({
           {item.source.label} → {tgt.label}
           <span className="text-faint"> · </span>
           {result ? (
-            <span className="tabular-nums">
-              {formatBytes(item.size)} → {formatBytes(result.size)}
-            </span>
+            <>
+              <span className="tabular-nums">
+                {formatBytes(item.size)} → {formatBytes(result.size)}
+              </span>
+              {delta && (
+                <span
+                  className={cn(
+                    "tabular-nums",
+                    delta.smaller
+                      ? "text-[#448361] dark:text-[#529e72]"
+                      : "text-faint",
+                  )}
+                >
+                  {` (${delta.label})`}
+                </span>
+              )}
+            </>
           ) : (
             <span className="tabular-nums">{formatBytes(item.size)}</span>
           )}

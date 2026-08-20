@@ -11,20 +11,19 @@
   },
   "dependencies": {
     "heic-to": "^1.5.2",
-    "next": "16.2.9",
-    "pako": "^2.1.0",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
+    "next": "16.3.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "utif": "^3.1.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.2.0",
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
+    "@biomejs/biome": "2.5.9",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
     "babel-plugin-react-compiler": "1.0.0",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2"
   }
 }
