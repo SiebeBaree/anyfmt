@@ -1,88 +1,92 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { cn } from "@/lib/utils";
-import { IconUpload } from "./icons";
+import { IconImage, IconPlus } from "./icons";
 
+const ACCEPT = "image/*,.heic,.heif,.tif,.tiff,.avif";
+
+/**
+ * File pickers. Drag & drop is handled at the page level (see Converter),
+ * so these only need to open the browse dialog.
+ *
+ * - "block": Notion-style image block placeholder for the empty state.
+ * - "row": the "+ New"-style row that sits at the bottom of the file list.
+ */
 export function Dropzone({
   onFiles,
-  compact = false,
+  variant = "block",
   disabled = false,
 }: {
   onFiles: (files: File[]) => void;
-  compact?: boolean;
+  variant?: "block" | "row";
   disabled?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [dragging, setDragging] = useState(false);
 
   function emit(list: FileList | null) {
     if (!list || list.length === 0) return;
     onFiles(Array.from(list));
   }
 
+  const input = (
+    <input
+      ref={inputRef}
+      type="file"
+      multiple
+      accept={ACCEPT}
+      className="hidden"
+      onChange={(e) => {
+        emit(e.target.files);
+        e.target.value = "";
+      }}
+    />
+  );
+
+  if (variant === "row") {
+    return (
+      <>
+        {input}
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => inputRef.current?.click()}
+          className="flex w-full items-center gap-2 px-3 py-[7px] text-sm text-muted outline-none transition-colors duration-100 hover:bg-wash focus-visible:bg-wash disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <IconPlus className="h-4 w-4" />
+          <span>
+            New image
+            <span className="text-faint">
+              {" "}
+              · drop or paste anywhere on the page
+            </span>
+          </span>
+        </button>
+      </>
+    );
+  }
+
   return (
     <>
-      <input
-        ref={inputRef}
-        type="file"
-        multiple
-        accept="image/*,.heic,.heif,.tif,.tiff,.avif"
-        className="hidden"
-        onChange={(e) => {
-          emit(e.target.files);
-          e.target.value = "";
-        }}
-      />
+      {input}
       <button
         type="button"
         disabled={disabled}
         onClick={() => inputRef.current?.click()}
-        onDragOver={(e) => {
-          e.preventDefault();
-          if (!disabled) setDragging(true);
-        }}
-        onDragLeave={(e) => {
-          e.preventDefault();
-          setDragging(false);
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragging(false);
-          if (!disabled) emit(e.dataTransfer.files);
-        }}
         className={cn(
-          "group relative flex w-full cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed text-center outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-accent/50",
-          compact ? "gap-2 px-4 py-5" : "gap-3 px-6 py-16",
-          dragging
-            ? "border-accent bg-accent/5"
-            : "border-line hover:border-zinc-400 hover:bg-surface-2 dark:hover:border-zinc-600",
+          "group flex w-full flex-col items-center justify-center gap-2.5 rounded-md bg-surface-2 px-6 py-14 text-center outline-none transition-colors duration-100",
+          "hover:bg-[rgba(55,53,47,0.08)] focus-visible:ring-2 focus-visible:ring-accent/40 dark:hover:bg-[rgba(255,255,255,0.08)]",
           disabled && "cursor-not-allowed opacity-50",
         )}
       >
-        <span
-          className={cn(
-            "flex items-center justify-center rounded-xl bg-surface-2 text-muted transition-colors group-hover:text-fg",
-            compact ? "h-9 w-9" : "h-12 w-12",
-            dragging && "text-accent",
-          )}
-        >
-          <IconUpload className={compact ? "h-[18px] w-[18px]" : "h-6 w-6"} />
+        <IconImage className="h-7 w-7 text-faint transition-colors duration-100 group-hover:text-muted" />
+        <span className="space-y-1">
+          <span className="block text-sm font-medium text-fg">Add images</span>
+          <span className="block text-sm text-muted">
+            Click to browse, drop files anywhere on the page, or paste from your
+            clipboard
+          </span>
         </span>
-        {compact ? (
-          <span className="text-sm text-muted">
-            <span className="font-medium text-fg">Add more</span> or drop here
-          </span>
-        ) : (
-          <span className="space-y-1">
-            <span className="block text-[15px] font-medium text-fg">
-              Drop images, or <span className="text-accent">browse</span>
-            </span>
-            <span className="block text-sm text-muted">
-              Up to 20 at once · converted on your device
-            </span>
-          </span>
-        )}
       </button>
     </>
   );

@@ -16,11 +16,33 @@ import { baseName, cn, downloadBlob, formatBytes, uid } from "@/lib/utils";
 import { createZip, type ZipEntry } from "@/lib/zip";
 import { Dropzone } from "./dropzone";
 import { FileItem } from "./file-item";
-import { IconBolt, IconDownload, IconSpinner } from "./icons";
+import {
+  IconDownload,
+  IconImage,
+  IconShield,
+  IconSliders,
+  IconSpinner,
+  IconUpload,
+} from "./icons";
 import { Button, Segmented, Slider, Toggle } from "./ui";
 
 const MAX_FILES = 20;
 const CONCURRENCY = 3;
+
+/** True when a drag carries actual files (not text or in-page elements). */
+function dragHasFiles(e: DragEvent): boolean {
+  return Array.from(e.dataTransfer?.types ?? []).includes("Files");
+}
+
+/** True when the paste happened inside a text input, where it should be left alone. */
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.isContentEditable
+  );
+}
 
 export function Converter() {
   const [items, setItems] = useState<ConvertItem[]>([]);
@@ -38,6 +60,7 @@ export function Converter() {
   );
   const [isConverting, setIsConverting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [pageDragging, setPageDragging] = useState(false);
 
   // Keep a live ref to the latest items so async work (conversion, zip export,
   // unmount cleanup) reads current state without re-binding. Updated post-commit.
@@ -136,6 +159,83 @@ export function Converter() {
       return [...prev, ...next];
     });
   }
+
+  // Latest addFiles for the window-level listeners below, which mount once.
+  const addFilesRef = useRef(addFiles);
+  useEffect(() => {
+    addFilesRef.current = addFiles;
+  });
+
+  // Feature: drop images anywhere on the page. A depth counter pairs
+  // dragenter/dragleave (they fire per crossed element) so the overlay only
+  // hides when the drag truly leaves the window.
+  useEffect(() => {
+    let depth = 0;
+
+    function onDragEnter(e: DragEvent) {
+      if (!dragHasFiles(e)) return;
+      e.preventDefault();
+      depth++;
+      setPageDragging(true);
+    }
+    function onDragOver(e: DragEvent) {
+      if (!dragHasFiles(e)) return;
+      // Required to allow the drop and suppress the browser's default
+      // open-the-file navigation.
+      e.preventDefault();
+    }
+    function onDragLeave(e: DragEvent) {
+      if (!dragHasFiles(e)) return;
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) setPageDragging(false);
+    }
+    function onDrop(e: DragEvent) {
+      if (!dragHasFiles(e)) return;
+      e.preventDefault();
+      depth = 0;
+      setPageDragging(false);
+      const files = Array.from(e.dataTransfer?.files ?? []);
+      if (files.length > 0) addFilesRef.current(files);
+    }
+
+    window.addEventListener("dragenter", onDragEnter);
+    window.addEventListener("dragover", onDragOver);
+    window.addEventListener("dragleave", onDragLeave);
+    window.addEventListener("drop", onDrop);
+    return () => {
+      window.removeEventListener("dragenter", onDragEnter);
+      window.removeEventListener("dragover", onDragOver);
+      window.removeEventListener("dragleave", onDragLeave);
+      window.removeEventListener("drop", onDrop);
+    };
+  }, []);
+
+  // Feature: paste an image from the clipboard. Clipboard files arrive with a
+  // generic name ("image.png"), so give them a friendlier, unique one.
+  const pasteCounter = useRef(0);
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      if (isEditableTarget(e.target)) return;
+      const files = Array.from(e.clipboardData?.files ?? []).filter((f) =>
+        f.type.startsWith("image/"),
+      );
+      if (files.length === 0) return;
+      e.preventDefault();
+      const renamed = files.map((file) => {
+        const ext = file.type.split("/")[1]?.split("+")[0] || "png";
+        pasteCounter.current++;
+        const name =
+          pasteCounter.current === 1
+            ? `pasted-image.${ext}`
+            : `pasted-image-${pasteCounter.current}.${ext}`;
+        return new File([file], name, { type: file.type });
+      });
+      addFilesRef.current(renamed);
+    }
+
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, []);
 
   function patchItem(id: string, patch: Partial<ConvertItem>) {
     setItems((prev) =>
@@ -242,78 +342,112 @@ export function Converter() {
 
   return (
     <div className="w-full">
-      <header className="mb-8 flex flex-col items-center text-center">
-        <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-white">
-            <IconBolt className="h-4 w-4" />
-          </span>
-          <h1 className="text-lg font-semibold tracking-tight text-fg">
-            anyfmt
-          </h1>
-        </div>
-        <p className="mt-2 text-sm text-muted">
-          Convert images right in your browser. Nothing is uploaded.
+      {/* Page header, Notion style: icon, title, description, callout. */}
+      <div aria-hidden className="select-none text-[56px] leading-none">
+        🖼️
+      </div>
+      <h1 className="mt-5 text-[40px] font-bold leading-[1.15] tracking-[-0.015em] text-fg">
+        anyfmt
+      </h1>
+      <p className="mt-2 text-[15px] leading-relaxed text-muted">
+        Convert images between formats, right here in your browser.
+      </p>
+
+      <div className="mt-6 flex items-start gap-3 rounded-md bg-callout px-4 py-3.5">
+        <span aria-hidden className="text-base leading-6">
+          🔒
+        </span>
+        <p className="text-sm leading-6 text-fg">
+          Everything runs on your device. Images are converted locally and never
+          uploaded anywhere.
         </p>
-      </header>
+      </div>
 
-      <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
-        {total === 0 ? (
-          <div className="p-4">
-            <Dropzone onFiles={addFiles} />
-            {notice && (
-              <p className="mt-3 text-center text-xs text-muted">{notice}</p>
+      <div className="my-8 h-px w-full bg-line" />
+
+      {total === 0 ? (
+        <>
+          <Dropzone onFiles={addFiles} />
+          {notice && <p className="mt-3 text-sm text-muted">{notice}</p>}
+          <p className="mt-4 text-xs text-faint">
+            PNG · JPEG · WebP · HEIC · TIFF · GIF · BMP · AVIF
+          </p>
+        </>
+      ) : (
+        <>
+          {/* Settings as Notion property rows. */}
+          <div
+            className={cn(
+              "flex flex-col gap-1 transition-opacity",
+              isConverting && "pointer-events-none opacity-60",
             )}
-            <p className="mt-4 text-center font-mono text-xs text-muted/70">
-              PNG · JPEG · WebP · HEIC · TIFF · GIF · BMP · AVIF
-            </p>
-          </div>
-        ) : (
-          <>
-            <div
-              className={cn(
-                "flex flex-wrap items-center gap-x-6 gap-y-4 border-b border-line p-4 transition-opacity",
-                isConverting && "pointer-events-none opacity-60",
-              )}
-            >
-              <div className="flex items-center gap-2.5">
-                <span className="text-sm text-muted">Convert to</span>
-                <Segmented
-                  ariaLabel="Target format"
-                  value={target}
-                  onChange={handleTargetChange}
-                  options={TARGETS.map((t) => ({
-                    value: t.id,
-                    label: t.label,
-                  }))}
-                />
+          >
+            <div className="flex min-h-[34px] flex-wrap items-center gap-x-2 gap-y-1">
+              <div className="flex w-[150px] shrink-0 items-center gap-2 text-sm text-muted">
+                <IconImage className="h-4 w-4" />
+                Format
               </div>
+              <Segmented
+                ariaLabel="Target format"
+                value={target}
+                onChange={handleTargetChange}
+                options={TARGETS.map((t) => ({
+                  value: t.id,
+                  label: t.label,
+                }))}
+              />
+            </div>
 
-              {tgt.lossy && (
-                <div className="flex min-w-[200px] flex-1 items-center gap-3">
-                  <span className="text-sm text-muted">Quality</span>
+            <div className="flex min-h-[34px] flex-wrap items-center gap-x-2 gap-y-1">
+              <div className="flex w-[150px] shrink-0 items-center gap-2 text-sm text-muted">
+                <IconSliders className="h-4 w-4" />
+                Quality
+              </div>
+              {tgt.lossy ? (
+                <div className="flex max-w-[300px] flex-1 items-center gap-3">
                   <Slider
                     min={1}
                     max={100}
                     value={quality}
                     onChange={handleQualityChange}
                   />
-                  <span className="w-9 shrink-0 text-right font-mono text-sm tabular-nums text-fg">
+                  <span className="w-10 shrink-0 text-right text-sm tabular-nums text-fg">
                     {quality}%
                   </span>
                 </div>
+              ) : (
+                <span className="text-sm text-faint">
+                  Lossless · always full quality
+                </span>
               )}
-
-              <div className="flex items-center gap-2.5">
-                <span className="text-sm text-muted">Remove metadata</span>
-                <Toggle
-                  checked={stripMetadata}
-                  onChange={handleStripChange}
-                  label="Remove metadata"
-                />
-              </div>
             </div>
 
-            <ul className="max-h-[min(50vh,460px)] divide-y divide-line overflow-y-auto">
+            <div className="flex min-h-[34px] flex-wrap items-center gap-x-2 gap-y-1">
+              <div className="flex w-[150px] shrink-0 items-center gap-2 text-sm text-muted">
+                <IconShield className="h-4 w-4" />
+                Remove metadata
+              </div>
+              <Toggle
+                checked={stripMetadata}
+                onChange={handleStripChange}
+                label="Remove metadata"
+              />
+            </div>
+          </div>
+
+          {/* File list as a Notion database list view. */}
+          <div className="mt-5 overflow-hidden rounded-md border border-line bg-surface">
+            {isConverting && (
+              <div className="h-[2px] w-full bg-line">
+                <div
+                  className="h-full bg-accent transition-[width] duration-300"
+                  style={{
+                    width: `${total > 0 ? Math.round((processed / total) * 100) : 0}%`,
+                  }}
+                />
+              </div>
+            )}
+            <ul className="max-h-[min(55vh,480px)] divide-y divide-line overflow-y-auto">
               {items.map((it) => (
                 <FileItem
                   key={it.id}
@@ -324,97 +458,103 @@ export function Converter() {
                 />
               ))}
             </ul>
-
-            <div className="border-t border-line p-3">
+            <div className="border-t border-line">
               <Dropzone
-                compact
+                variant="row"
                 onFiles={addFiles}
                 disabled={total >= MAX_FILES || isConverting}
               />
-              {(notice || total >= MAX_FILES) && (
-                <p className="mt-2 text-center text-xs text-muted">
-                  {notice ?? `Maximum ${MAX_FILES} images reached`}
-                </p>
+            </div>
+          </div>
+
+          {(notice || total >= MAX_FILES) && (
+            <p className="mt-2 text-xs text-muted">
+              {notice ?? `Maximum ${MAX_FILES} images reached`}
+            </p>
+          )}
+
+          {/* Action bar. */}
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted">
+              {allDone && doneItems.length > 0 ? (
+                <>
+                  {doneItems.length} ready
+                  {saved > 0 && (
+                    <>
+                      {" · "}
+                      <span className="text-[#448361] dark:text-[#529e72]">
+                        saved {formatBytes(saved)}
+                      </span>
+                    </>
+                  )}
+                  {errorCount > 0 && ` · ${errorCount} failed`}
+                </>
+              ) : (
+                <>
+                  {total} image{total > 1 ? "s" : ""}
+                  {errorCount > 0 && ` · ${errorCount} failed`}
+                </>
               )}
-            </div>
+            </p>
 
-            <div className="h-0.5 w-full bg-line">
-              <div
-                className="h-full bg-accent transition-[width] duration-300"
-                style={{
-                  width: `${total > 0 ? Math.round((processed / total) * 100) : 0}%`,
-                }}
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-3 p-4">
-              <p className="text-sm text-muted">
-                {allDone && doneItems.length > 0 ? (
-                  <>
-                    {doneItems.length} ready
-                    {saved > 0 && (
-                      <>
-                        {" · "}
-                        <span className="text-emerald-600 dark:text-emerald-400">
-                          saved {formatBytes(saved)}
-                        </span>
-                      </>
-                    )}
-                    {errorCount > 0 && ` · ${errorCount} failed`}
-                  </>
-                ) : (
-                  <>
-                    {total} image{total > 1 ? "s" : ""}
-                    {errorCount > 0 && ` · ${errorCount} failed`}
-                  </>
-                )}
-              </p>
-
-              <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                onClick={clearAll}
+                disabled={isConverting}
+              >
+                Clear
+              </Button>
+              {doneItems.length > 0 && (
                 <Button
-                  variant="ghost"
-                  onClick={clearAll}
+                  variant={pendingCount > 0 ? "secondary" : "primary"}
+                  onClick={downloadAll}
                   disabled={isConverting}
                 >
-                  Clear
+                  <IconDownload className="h-4 w-4" />
+                  {doneItems.length > 1 ? "Download all" : "Download"}
                 </Button>
-                {doneItems.length > 0 && (
-                  <Button
-                    variant={pendingCount > 0 ? "secondary" : "primary"}
-                    onClick={downloadAll}
-                    disabled={isConverting}
-                  >
-                    <IconDownload className="h-4 w-4" />
-                    {doneItems.length > 1 ? "Download all" : "Download"}
-                  </Button>
-                )}
-                {(pendingCount > 0 || isConverting) && (
-                  <Button
-                    onClick={convertAll}
-                    disabled={isConverting || pendingCount === 0}
-                  >
-                    {isConverting ? (
-                      <>
-                        <IconSpinner className="h-4 w-4 animate-spin" />
-                        Converting {processed}/{total}
-                      </>
-                    ) : (
-                      <>
-                        Convert {pendingCount} image
-                        {pendingCount > 1 ? "s" : ""}
-                      </>
-                    )}
-                  </Button>
-                )}
-              </div>
+              )}
+              {(pendingCount > 0 || isConverting) && (
+                <Button
+                  onClick={convertAll}
+                  disabled={isConverting || pendingCount === 0}
+                >
+                  {isConverting ? (
+                    <>
+                      <IconSpinner className="h-4 w-4 animate-spin" />
+                      Converting {processed}/{total}
+                    </>
+                  ) : (
+                    <>
+                      Convert {pendingCount} image
+                      {pendingCount > 1 ? "s" : ""}
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
 
-      <p className="mt-6 text-center text-xs text-muted/70">
-        Your images never leave this device.
-      </p>
+      {/* Full-page drop overlay. pointer-events-none keeps drag events flowing
+          to the window listeners underneath. */}
+      {pageDragging && (
+        <div className="pointer-events-none fixed inset-0 z-50 bg-background/60 p-6 backdrop-blur-[2px]">
+          <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-accent bg-accent/5">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-white shadow-[0_4px_12px_rgba(35,131,226,0.4)]">
+              <IconUpload className="h-6 w-6" />
+            </span>
+            <p className="text-lg font-semibold text-fg">
+              Drop images to add them
+            </p>
+            <p className="text-sm text-muted">
+              They will be converted right on this device
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

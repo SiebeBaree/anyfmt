@@ -3,33 +3,47 @@
 import { type TargetFormat, targetInfo } from "@/lib/formats";
 import type { ConvertItem } from "@/lib/types";
 import { formatBytes } from "@/lib/utils";
-import {
-  IconArrowRight,
-  IconCheck,
-  IconClose,
-  IconDownload,
-  IconSpinner,
-} from "./icons";
-import { Button } from "./ui";
+import { IconCheck, IconClose, IconDownload, IconSpinner } from "./icons";
+import { Button, Tag } from "./ui";
 
-function SavingBadge({ from, to }: { from: number; to: number }) {
+function savingsLabel(from: number, to: number): string | null {
   if (!from || !to) return null;
   const pct = Math.round((1 - to / from) * 100);
-  if (pct >= 1) {
-    return (
-      <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-        −{pct}%
-      </span>
-    );
-  }
-  if (pct <= -1) {
-    return (
-      <span className="rounded-full bg-zinc-500/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted">
-        +{Math.abs(pct)}%
-      </span>
-    );
-  }
+  if (pct >= 1) return `−${pct}%`;
+  if (pct <= -1) return `+${Math.abs(pct)}%`;
   return null;
+}
+
+function StatusTag({ item }: { item: ConvertItem }) {
+  switch (item.status) {
+    case "pending":
+      return <Tag color="gray">Ready</Tag>;
+    case "converting":
+      return (
+        <Tag color="blue">
+          <IconSpinner className="h-3 w-3 animate-spin" />
+          Converting
+        </Tag>
+      );
+    case "done": {
+      const saved = item.result
+        ? savingsLabel(item.size, item.result.size)
+        : null;
+      return (
+        <Tag color="green">
+          <IconCheck className="h-3 w-3" />
+          Done
+          {saved && <span className="hidden sm:inline">{` · ${saved}`}</span>}
+        </Tag>
+      );
+    }
+    case "error":
+      return (
+        <Tag color="red" title={item.error}>
+          {item.error ?? "Failed"}
+        </Tag>
+      );
+  }
 }
 
 export function FileItem({
@@ -47,8 +61,8 @@ export function FileItem({
   const result = item.status === "done" ? item.result : undefined;
 
   return (
-    <li className="flex items-center gap-3 px-4 py-2.5">
-      <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-line bg-surface-2">
+    <li className="group flex items-center gap-3 px-3 py-2 transition-colors duration-100 hover:bg-wash">
+      <div className="h-8 w-8 shrink-0 overflow-hidden rounded-[4px] shadow-[0_0_0_1px_var(--line)]">
         {item.previewUrl ? (
           // Local object URL of an already-decoded image; next/image adds no value here.
           // biome-ignore lint/performance/noImgElement: blob preview, not a remote asset
@@ -58,7 +72,7 @@ export function FileItem({
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center font-mono text-[10px] font-medium text-muted">
+          <div className="flex h-full w-full items-center justify-center bg-surface-2 font-mono text-[9px] font-medium text-muted">
             {item.source.label}
           </div>
         )}
@@ -66,51 +80,32 @@ export function FileItem({
 
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-fg">{item.name}</p>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted">
-          <span className="font-mono uppercase">{item.source.label}</span>
-          <IconArrowRight className="h-3 w-3" />
-          <span className="font-mono uppercase">{tgt.label}</span>
-          <span className="text-line">·</span>
+        <p className="mt-px truncate text-xs text-muted">
+          {item.source.label} → {tgt.label}
+          <span className="text-faint"> · </span>
           {result ? (
-            <>
-              <span className="font-mono">
-                {formatBytes(item.size)}{" "}
-                <span className="text-muted/60">→</span>{" "}
-                <span className="text-fg">{formatBytes(result.size)}</span>
-              </span>
-              <SavingBadge from={item.size} to={result.size} />
-            </>
+            <span className="tabular-nums">
+              {formatBytes(item.size)} → {formatBytes(result.size)}
+            </span>
           ) : (
-            <span className="font-mono">{formatBytes(item.size)}</span>
+            <span className="tabular-nums">{formatBytes(item.size)}</span>
           )}
-        </div>
+        </p>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1">
-        {item.status === "converting" && (
-          <IconSpinner className="h-4 w-4 animate-spin text-accent" />
-        )}
-        {item.status === "done" && (
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-            <IconCheck className="h-3 w-3" />
-          </span>
-        )}
-        {item.status === "error" && (
-          <span
-            className="max-w-[150px] truncate text-xs text-red-500"
-            title={item.error}
-          >
-            {item.error ?? "Failed"}
-          </span>
-        )}
-        {result && (
-          <Button variant="icon" onClick={onDownload} aria-label="Download">
-            <IconDownload className="h-4 w-4" />
+      <div className="flex shrink-0 items-center gap-1.5">
+        <StatusTag item={item} />
+        {/* Hover-revealed on pointer devices, always visible on touch. */}
+        <div className="flex items-center opacity-0 transition-opacity duration-100 focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
+          {result && (
+            <Button variant="icon" onClick={onDownload} aria-label="Download">
+              <IconDownload className="h-4 w-4" />
+            </Button>
+          )}
+          <Button variant="icon" onClick={onRemove} aria-label="Remove">
+            <IconClose className="h-4 w-4" />
           </Button>
-        )}
-        <Button variant="icon" onClick={onRemove} aria-label="Remove">
-          <IconClose className="h-4 w-4" />
-        </Button>
+        </div>
       </div>
     </li>
   );

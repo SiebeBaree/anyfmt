@@ -1,26 +1,50 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fafafa;
+  --background: #ffffff;
   --surface: #ffffff;
-  --surface-2: #f4f4f5;
-  --line: #e6e6e9;
-  --fg: #18181b;
-  --muted: #71717a;
-  --accent: #6366f1;
-  --accent-strong: #4f46e5;
+  --surface-2: #f7f7f5;
+  --wash: rgba(55, 53, 47, 0.06);
+  --callout: #f1f1ef;
+  --line: rgba(55, 53, 47, 0.09);
+  --line-strong: rgba(55, 53, 47, 0.16);
+  --fg: #37352f;
+  --muted: #787774;
+  --faint: #9b9a97;
+  --accent: #2383e2;
+  --accent-strong: #0077d4;
+  --tag-gray-bg: rgba(227, 226, 224, 0.7);
+  --tag-gray-fg: #32302c;
+  --tag-blue-bg: #d3e5ef;
+  --tag-blue-fg: #183347;
+  --tag-green-bg: #dbeddb;
+  --tag-green-fg: #1c3829;
+  --tag-red-bg: #ffe2dd;
+  --tag-red-fg: #5d1715;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #09090b;
-    --surface: #131316;
-    --surface-2: #1c1c20;
-    --line: #27272a;
-    --fg: #fafafa;
-    --muted: #a1a1aa;
-    --accent: #7c7cf3;
-    --accent-strong: #6366f1;
+    --background: #191919;
+    --surface: #202020;
+    --surface-2: #252525;
+    --wash: rgba(255, 255, 255, 0.055);
+    --callout: #252525;
+    --line: rgba(255, 255, 255, 0.094);
+    --line-strong: rgba(255, 255, 255, 0.16);
+    --fg: #d4d4d4;
+    --muted: #9b9b9b;
+    --faint: #6f6f6f;
+    --accent: #2383e2;
+    --accent-strong: #3a95e8;
+    --tag-gray-bg: #373737;
+    --tag-gray-fg: #d4d4d4;
+    --tag-blue-bg: #143a4e;
+    --tag-blue-fg: #9ec8e4;
+    --tag-green-bg: #243d30;
+    --tag-green-fg: #a3cfbb;
+    --tag-red-bg: #522e2a;
+    --tag-red-fg: #f0a49a;
   }
 }
 
@@ -28,13 +52,22 @@
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-wash: var(--wash);
+  --color-callout: var(--callout);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-fg: var(--fg);
   --color-muted: var(--muted);
+  --color-faint: var(--faint);
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans:
+    ui-sans-serif, -apple-system, BlinkMacSystemFont,
+    "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji",
+    Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
+  --font-mono:
+    ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
 }
 
 html {
@@ -44,11 +77,86 @@ html {
 body {
   background: var(--background);
   color: var(--fg);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgba(35, 131, 226, 0.28);
 }
 
 /* Thin, unobtrusive scrollbars for the file list. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--line) transparent;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+/* Notion-style range slider: 4px track with a filled left segment (via
+   --fill set inline) and a white circular thumb. Track/thumb pseudo-elements
+   cannot share rules across engines, hence the duplication. */
+.nslider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 16px;
+  width: 100%;
+  background: transparent;
+}
+.nslider:disabled {
+  opacity: 0.4;
+}
+.nslider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    var(--accent) var(--fill, 50%),
+    var(--line-strong) var(--fill, 50%)
+  );
+}
+.nslider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -6px;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid rgba(15, 15, 15, 0.2);
+  box-shadow: 0 1px 2px rgba(15, 15, 15, 0.15);
+  transition: transform 120ms ease;
+}
+.nslider:not(:disabled)::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+.nslider::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-strong);
+}
+.nslider::-moz-range-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.nslider::-moz-range-thumb {
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid rgba(15, 15, 15, 0.2);
+  box-shadow: 0 1px 2px rgba(15, 15, 15, 0.15);
+}
+.nslider:focus-visible {
+  outline: none;
+}
+.nslider:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 0 0 3px rgba(35, 131, 226, 0.3),
+    0 1px 2px rgba(15, 15, 15, 0.15);
+}
+.nslider:focus-visible::-moz-range-thumb {
+  box-shadow:
+    0 0 0 3px rgba(35, 131, 226, 0.3),
+    0 1px 2px rgba(15, 15, 15, 0.15);
 }

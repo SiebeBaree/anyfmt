@@ -57,16 +57,52 @@ export function IconArrowRight({ className }: IconProps) {
   );
 }
 
-export function IconBolt({ className }: IconProps) {
+export function IconPlus({ className }: IconProps) {
   return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path d="M13.5 2 4 13.5h6L9.5 22 20 10.5h-6L13.5 2Z" />
+    <svg className={className} aria-hidden="true" focusable="false" {...base}>
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
+export function IconImage({ className }: IconProps) {
+  return (
+    <svg className={className} aria-hidden="true" focusable="false" {...base}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="9" cy="10" r="1.5" />
+      <path d="m5 19 5.5-5.5a1.4 1.4 0 0 1 2 0L19 20" />
+      <path d="m15 16 1.5-1.5a1.4 1.4 0 0 1 2 0L21 17" />
+    </svg>
+  );
+}
+
+export function IconSliders({ className }: IconProps) {
+  return (
+    <svg className={className} aria-hidden="true" focusable="false" {...base}>
+      <path d="M4 8h9" />
+      <path d="M17 8h3" />
+      <circle cx="15" cy="8" r="2" />
+      <path d="M4 16h3" />
+      <path d="M11 16h9" />
+      <circle cx="9" cy="16" r="2" />
+    </svg>
+  );
+}
+
+export function IconShield({ className }: IconProps) {
+  return (
+    <svg className={className} aria-hidden="true" focusable="false" {...base}>
+      <path d="M12 3 5 6v5c0 4.4 3 8.4 7 9.7 4-1.3 7-5.3 7-9.7V6l-7-3Z" />
+    </svg>
+  );
+}
+
+export function IconLock({ className }: IconProps) {
+  return (
+    <svg className={className} aria-hidden="true" focusable="false" {...base}>
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
     </svg>
   );
 }
